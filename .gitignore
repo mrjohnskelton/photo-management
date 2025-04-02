@@ -1,0 +1,3 @@
+./rename_commands.sh
+./renamer/src/*_[0-9].py
+.venv

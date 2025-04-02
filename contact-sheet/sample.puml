@@ -1,0 +1,14 @@
+@startuml
+<style>
+root {
+    .styled {
+        BorderColor #999999;
+        BorderThickness 5
+    }
+}
+</style>
+participant "Fred" as fred<<styled>>
+note over fred
+here
+end note
+@enduml

@@ -1,0 +1,12 @@
+Original prompt...
+Write some python code that will enable me to rename JPEG image files based on the date and time that the image was taken.
+The code should determine the date and time the image was taken from the image meta-data.
+In the ISO 8601 format, the target file name should be: YYYY-MM-DD-HH-mm. A suffix should also be applied to every filename to avoid target name clashes. The suffix will be of the format '-0X'.  The code should maintain a counter for each file and if the target name is going to clash with an existing file name then the counter should be incremented so that the suffix makes the new target filename unique.  The '0X' suffix should start at 0 and use leading zeroes for two digit numbers.  This means the overall filename format will be "YYYY-MM-DD-HH-mm-0X.JPG".
+The output of the code should be a set of UNIX mv commands to move the files - i.e. the python code should not rename the files itself, but instead should produce a command file which can be run to rename (mv) the files.  All file renaming should be handled by a single Unix command file with many ;mv; commands in it.
+The code must work across all files in a named directory and also tree walk to look for any files in subdirectories of the named directory.
+
+Later amended code by adding to prompt/chat history...
+Amend this code to assume that all target files wll be in the parent directory. All clashing filenames in both the parent directory and all sub-directories must be renamed according to the rules provided to ensure that (a) all of the renamed files are moved to the parent folder and (b) none of the target names clash.
+
+Later amended code by adding to prompt/chat history...
+Amend the above code again. The code should take two directory arguments. The first directory is what I've been describing as the 'parent' or target folder. The target filenames in this folder must be unique as per the description provided. The second directory is the source directory. This second directory should be tree walked as per the previous requests.
