@@ -1,3 +1,8 @@
 ./rename_commands.sh
 ./renamer/src/*_[0-9].py
 .venv
+.DS_Store
+**/.DS_Store
+./renamer/src/create_renamer_0.py
+./renamer/src/create_renamer_1.py
+./renamer/src/create_renamer_2.py
