@@ -2,22 +2,22 @@ import os
 import piexif
 import datetime
 
-def rename_images_by_exif_date(directory, output_filename="rename_commands.sh"):
+def rename_images_by_exif_date(target_directory, source_directory, output_filename="rename_commands.sh"):
     """
-    Renames JPEG images in a directory and its subdirectories based on EXIF date/time,
-    moving all renamed files to the parent directory.
+    Renames JPEG images in a source directory and its subdirectories based on EXIF date/time,
+    moving all renamed files to the target directory.
 
     Args:
-        directory (str): The directory containing the images.
+        target_directory (str): The directory where renamed files will be moved.
+        source_directory (str): The directory containing the images to be renamed.
         output_filename (str): The name of the output script file.
     """
 
     rename_commands = []
     file_counters = {}  # Dictionary to track file name counters
-    target_directory = os.path.dirname(directory)  # Parent directory
 
     files_to_process = []
-    for root, _, files in os.walk(directory):
+    for root, _, files in os.walk(source_directory):
         for filename in files:
             if filename.lower().endswith(".jpg") or filename.lower().endswith(".jpeg"):
                 files_to_process.append(os.path.join(root, filename))
@@ -68,5 +68,10 @@ def rename_images_by_exif_date(directory, output_filename="rename_commands.sh"):
     print(f"Rename commands written to {output_filename}")
 
 if __name__ == "__main__":
-    directory_to_process = "/Users/john_skelton/Documents/202503 - India"  # Replace with the directory containing your images
-    rename_images_by_exif_date(directory_to_process)
+    target_dir = "/Users/john_skelton/Documents/202503 - India"  # Replace with the target directory
+    source_dir = "/Users/john_skelton/Documents/202503 - India/Johns Phone"  # Replace with the source directory
+
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir) #create target dir if not exists
+
+    rename_images_by_exif_date(target_dir, source_dir)
