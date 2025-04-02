@@ -2,7 +2,9 @@
 
 ## GenAI Prompt
 
-I have photographs stored in folders in an AWS S3 bucket.  I need to write a python programme which can iterate through the photographs in a folder and produce a contact sheet of the images.  The photographs will have a filetype of "jpg", "JPG", or "jpeg'.  Other filetypes which are also JPEG images should also be processed. Anything that is not a JPEG file should be ignored.  Each contact sheet should be A4 sized paper.  Each sheet should show 4 columns and 6 rows of scaled down  photograph images with the filename of the photograph underneath the scaled down image.  Write a python program that will do this.
+I have photographs stored in folders in an AWS S3 bucket.  Write a python program which will iterate through the photographs in a given S3 folder and produce a contact sheet report of the images.  The photographs will have a filetype of "jpg", "JPG", or "jpeg'.  Other filetypes which are also JPEG images should also be processed. Anything that is not a JPEG file should be ignored.  Each contact sheet should be A4 sized paper.  Each sheet should show 4 columns and 6 rows of scaled down photograph images with the filename of the photograph underneath the scaled down image.  The program should tree walk down through the sub-folders of the given S3 folder.  Each new sub-folder should trigger a new page.
+The header of each page should be the full S3 folder structure of the current folder or sub-folder being processed. 
+The S3 bucket name and start folder should be read from a seperate file which can be exlucded from github.
 
 ## Output
 
