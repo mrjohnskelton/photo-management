@@ -1,4 +1,5 @@
 import os
+import io
 import boto3
 import exifread
 import configparser
@@ -6,6 +7,11 @@ import logging
 from pathlib import Path
 import re # For sanitizing filename
 from typing import List, Dict, Tuple
+
+# exif_getter.py
+
+from PIL import Image
+from PIL.ExifTags import TAGS
 
 # --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -57,7 +63,8 @@ def get_s3_files(bucket_name: str, prefix: str) -> Dict[str, str]:
     paginator = s3.get_paginator('list_objects_v2')
     for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
         for obj in page.get('Contents', []):
-            files[obj['Key']] = obj['Key']
+            path,name=obj['Key'].rsplit('/',1)
+            files[name] = obj['Key'] #Fragile as duplicate filenames will get overwritten - but so long as I've got it once risk is minimal?
     return files
 
 def get_local_files(directory: str) -> Dict[str, str]:
@@ -68,54 +75,35 @@ def get_local_files(directory: str) -> Dict[str, str]:
             files[filename] = file_path
     return files
 
-def get_exif_data(file_path: str) -> Dict:
-    with open(file_path, 'rb') as f:
-        tags = exifread.process_file(f)
-    return tags
 
-def compare_files(s3_files: Dict[str, str], local_files: Dict[str, str]) -> Tuple[List[str], List[str], List[str], List[str]]:
-    s3_only = []
-    local_only = []
-    common_names = []
-    identical_exif = []
+def compare_files(s3_files: Dict[str, str], local_files: Dict[str, str], bucket_name: str) -> Tuple[List[str], List[str], List[str]]:
+    s3_only = {}
+    local_only = {}
+    common_names = {}
 
     s3_names = set(s3_files.keys())
     local_names = set(local_files.keys())
+    
+    # Files with commmon names regardles of path
+    common_name_keys = s3_names.intersection(local_names)
+    for key in common_name_keys:
+        common_names[key] = s3_files[key] + " <--> " + local_files[key]
+        
+    local_only_keys = local_names.difference(s3_names)
+    for key in local_only_keys:
+        local_only[key] = local_files[key] + " not matched in S3"
+        
+    s3_only_keys = s3_names.difference(local_names)
+    for key in s3_only_keys:
+        s3_only[key] = s3_files[key] + " not matched locally"
+    
+    return common_names, s3_only, local_only
 
-    # Compare files with common names
-    for name in s3_names & local_names:
-        print(".", end="")
-        s3_file = s3_files[name]
-        local_file = local_files[name]
-        s3_exif = get_exif_data(s3_file)
-        local_exif = get_exif_data(local_file)
-        if s3_exif == local_exif:
-            common_names.append((s3_file, local_file))
-        else:
-            s3_only.append(s3_file)
-            local_only.append(local_file)
-
-    # Compare files with different names based on EXIF data
-    for s3_name, s3_file in s3_files.items():
-        print(".", end="")
-        if s3_name not in local_names:
-            s3_exif = get_exif_data(s3_file)
-            found = False
-            for local_name, local_file in local_files.items():
-                if local_name not in s3_names:
-                    local_exif = get_exif_data(local_file)
-                    if s3_exif == local_exif:
-                        identical_exif.append((s3_file, local_file))
-                        found = True
-                        break
-            if not found:
-                s3_only.append(s3_file)
-
-    for local_name, local_file in local_files.items():
-        if local_name not in s3_names and not any(local_file in pair for pair in identical_exif):
-            local_only.append(local_file)
-
-    return common_names, identical_exif, s3_only, local_only
+def list_results(heading:str, dct:Dict[str,str], of):
+    print("\n\n\n"+heading, file=of)
+    keys = dct.keys()
+    for key in keys:
+        print(f"{key}:\t{dct[key]}", file=of)
 
 def main():
     try:
@@ -133,24 +121,12 @@ def main():
     s3_files = get_s3_files(BUCKET_NAME, START_FOLDER)
     local_files = get_local_files(LOCAL_FOLDER)
 
-    print("Starting comparison", end="")
-    common_names, identical_exif, s3_only, local_only = compare_files(s3_files, local_files)
-
-    print("Files with common names and identical EXIF data:")
-    for s3_file, local_file in common_names:
-        print(f"S3: {s3_file} <-> Local: {local_file}")
-
-    print("\nFiles with identical EXIF data but different names:")
-    for s3_file, local_file in identical_exif:
-        print(f"S3: {s3_file} <-> Local: {local_file}")
-
-    print("\nFiles in S3 but not in local:")
-    for file in s3_only:
-        print(file)
-
-    print("\nFiles in local but not in S3:")
-    for file in local_only:
-        print(file)
+    common_names, s3_only, local_only = compare_files(s3_files, local_files, BUCKET_NAME)
+    
+    with open("Compare "+sanitize_filename(START_FOLDER)+".txt", "w") as f:
+        list_results(f"Files with common names ({len(common_names)}):", common_names, f)
+        list_results(f"Files in S3 but not in local ({len(s3_only)}):", s3_only, f)
+        list_results(f"Files in local but not in S3 ({len(local_only)}):", local_only, f)
 
 if __name__ == "__main__":
     main()
