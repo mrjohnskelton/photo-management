@@ -25,28 +25,47 @@ def get_exif_data(file_path: str) -> Dict:
         tags = exifread.process_file(f)
     return tags
 
-def compare_files(s3_files: Dict[str, str], local_files: Dict[str, str]) -> Tuple[List[str], List[str]]:
+def compare_files(s3_files: Dict[str, str], local_files: Dict[str, str]) -> Tuple[List[str], List[str], List[str], List[str]]:
     s3_only = []
     local_only = []
+    common_names = []
+    identical_exif = []
 
     s3_names = set(s3_files.keys())
     local_names = set(local_files.keys())
 
-    common_names = s3_names & local_names
-
-    for name in common_names:
+    # Compare files with common names
+    for name in s3_names & local_names:
         s3_file = s3_files[name]
         local_file = local_files[name]
         s3_exif = get_exif_data(s3_file)
         local_exif = get_exif_data(local_file)
-        if s3_exif != local_exif:
+        if s3_exif == local_exif:
+            common_names.append((s3_file, local_file))
+        else:
             s3_only.append(s3_file)
             local_only.append(local_file)
 
-    s3_only.extend([s3_files[name] for name in s3_names - common_names])
-    local_only.extend([local_files[name] for name in local_names - common_names])
+    # Compare files with different names based on EXIF data
+    for s3_name, s3_file in s3_files.items():
+        if s3_name not in local_names:
+            s3_exif = get_exif_data(s3_file)
+            found = False
+            for local_name, local_file in local_files.items():
+                if local_name not in s3_names:
+                    local_exif = get_exif_data(local_file)
+                    if s3_exif == local_exif:
+                        identical_exif.append((s3_file, local_file))
+                        found = True
+                        break
+            if not found:
+                s3_only.append(s3_file)
 
-    return s3_only, local_only
+    for local_name, local_file in local_files.items():
+        if local_name not in s3_names and not any(local_file in pair for pair in identical_exif):
+            local_only.append(local_file)
+
+    return common_names, identical_exif, s3_only, local_only
 
 def main():
     bucket_name = 'your-s3-bucket'
@@ -56,9 +75,17 @@ def main():
     s3_files = get_s3_files(bucket_name, s3_prefix)
     local_files = get_local_files(local_directory)
 
-    s3_only, local_only = compare_files(s3_files, local_files)
+    common_names, identical_exif, s3_only, local_only = compare_files(s3_files, local_files)
 
-    print("Files in S3 but not in local:")
+    print("Files with common names and identical EXIF data:")
+    for s3_file, local_file in common_names:
+        print(f"S3: {s3_file} <-> Local: {local_file}")
+
+    print("\nFiles with identical EXIF data but different names:")
+    for s3_file, local_file in identical_exif:
+        print(f"S3: {s3_file} <-> Local: {local_file}")
+
+    print("\nFiles in S3 but not in local:")
     for file in s3_only:
         print(file)
 
