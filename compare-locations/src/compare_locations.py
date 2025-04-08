@@ -1,7 +1,55 @@
 import os
 import boto3
 import exifread
+import configparser
+import logging
+from pathlib import Path
+import re # For sanitizing filename
 from typing import List, Dict, Tuple
+
+# --- Configuration ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+CONFIG_FILE = 'config.ini'
+
+# --- Helper Functions ---
+
+def read_config(filename=CONFIG_FILE):
+    """Reads configuration from the INI file."""
+    config = configparser.ConfigParser()
+    script_dir = Path(__file__).resolve().parent
+    filename = script_dir / filename
+    if not os.path.exists(filename):
+        logging.error(f"Configuration file '{filename}' not found.")
+        raise FileNotFoundError(f"Configuration file '{filename}' not found.")
+    config.read(filename)
+    try:
+        s3_config = config['S3']
+        return {
+            'bucket_name': s3_config['BucketName'],
+            'start_folder': s3_config['StartFolder'],
+            'local_folder': s3_config['LocalFolder']
+        }
+    except KeyError as e:
+        logging.error(f"Missing configuration key: {e}")
+        raise KeyError(f"Missing configuration key in '{filename}': {e}")
+    except ValueError as e:
+         logging.error(f"Invalid numeric value in configuration: {e}")
+         raise ValueError(f"Invalid numeric value in configuration file '{filename}': {e}")
+
+def sanitize_filename(name):
+    """Removes or replaces characters invalid for filenames."""
+    # Remove leading/trailing whitespace and slashes
+    name = name.strip().strip('/')
+    # Replace slashes with underscores
+    name = name.replace('/', '_')
+    # Remove other potentially problematic characters (adjust regex as needed)
+    name = re.sub(r'[\\:*?"<>|]+', '', name)
+    # Replace spaces with underscores (optional)
+    # name = name.replace(' ', '_')
+    return name if name else "default"
+
+
 
 def get_s3_files(bucket_name: str, prefix: str) -> Dict[str, str]:
     s3 = boto3.client('s3')
@@ -36,6 +84,7 @@ def compare_files(s3_files: Dict[str, str], local_files: Dict[str, str]) -> Tupl
 
     # Compare files with common names
     for name in s3_names & local_names:
+        print(".", end="")
         s3_file = s3_files[name]
         local_file = local_files[name]
         s3_exif = get_exif_data(s3_file)
@@ -48,6 +97,7 @@ def compare_files(s3_files: Dict[str, str], local_files: Dict[str, str]) -> Tupl
 
     # Compare files with different names based on EXIF data
     for s3_name, s3_file in s3_files.items():
+        print(".", end="")
         if s3_name not in local_names:
             s3_exif = get_exif_data(s3_file)
             found = False
@@ -68,13 +118,22 @@ def compare_files(s3_files: Dict[str, str], local_files: Dict[str, str]) -> Tupl
     return common_names, identical_exif, s3_only, local_only
 
 def main():
-    bucket_name = 'your-s3-bucket'
-    s3_prefix = 'your/s3/prefix'
-    local_directory = 'your/local/directory'
+    try:
+        config = read_config()
+    except (FileNotFoundError, KeyError, ValueError) as e:
+        logging.critical(f"Configuration error: {e}")
+        exit(1)
+        
+    
 
-    s3_files = get_s3_files(bucket_name, s3_prefix)
-    local_files = get_local_files(local_directory)
+    BUCKET_NAME = config['bucket_name']
+    START_FOLDER = config['start_folder']
+    LOCAL_FOLDER = config['local_folder']
 
+    s3_files = get_s3_files(BUCKET_NAME, START_FOLDER)
+    local_files = get_local_files(LOCAL_FOLDER)
+
+    print("Starting comparison", end="")
     common_names, identical_exif, s3_only, local_only = compare_files(s3_files, local_files)
 
     print("Files with common names and identical EXIF data:")

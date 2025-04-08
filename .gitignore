@@ -3,4 +3,4 @@
 .venv
 .DS_Store
 **/.DS_Store
-contact-sheet/src/config.ini
+**/src/config.ini
